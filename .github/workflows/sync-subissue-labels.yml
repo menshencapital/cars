@@ -1,41 +1,19 @@
-name: Sync Subissue Labels
+name: Sync Parent Issue Labels to Sub-Issues
 
 on:
   issues:
-    types: [opened, edited]
+    types: [opened, edited, reopened]
 
 jobs:
-  sync-labels:
+  sync_labels:
     runs-on: ubuntu-latest
     steps:
-      - name: Check for parent issues
-        uses: actions/github-script@v5
+      - name: Sync Labels from Parent Issue
+        uses: actions/github-script@v7
         with:
           script: |
-            const { data: issue } = await github.issues.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number
-            });
-
-            // Get parent issues using issue relationships endpoint
-            const { data: relationships } = await github.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number
-            });
-
-            const parentIssues = relationships.filter(comment => comment.body.includes('/parent')).map(comment => comment.body.split('/parent')[1].trim());
-
-            // If parent issues found, apply labels
-            if (parentIssues.length > 0) {
-              const labelToApply = 'parent'; // or any logic to determine labels
-              for (const parentIssue of parentIssues) {
-                await github.issues.addLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: parentIssue,
-                  labels: [labelToApply]
-                });
-              }
-            }
+            // Get the current issue
+            const issue = context.issue;
+            
+            // Fetch issue details
+            const { data: currentIssue } = await github.rest
