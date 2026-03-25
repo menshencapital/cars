@@ -1,41 +1,41 @@
-name: Sync Parent Labels to Sub-Issues
+name: Sync Subissue Labels
 
 on:
   issues:
-    types: [opened]
+    types: [opened, edited]
 
 jobs:
   sync-labels:
     runs-on: ubuntu-latest
     steps:
-      - name: Check if issue is a sub-issue and copy parent labels
-        uses: actions/github-script@v7
+      - name: Check for parent issues
+        uses: actions/github-script@v5
         with:
           script: |
-            const issue = context.payload.issue;
-            
-            // Get the parent issue from the issue body
-            const parentMatch = issue.body?.match(/#(\d+)/);
-            if (!parentMatch) return;
-            
-            const parentIssueNumber = parseInt(parentMatch[1]);
-            
-            try {
-              const parentIssue = await github.rest.issues.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: parentIssueNumber
-              });
-              
-              // Copy labels from parent to sub-issue
-              if (parentIssue.data.labels.length > 0) {
-                await github.rest.issues.addLabels({
+            const { data: issue } = await github.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            // Get parent issues using issue relationships endpoint
+            const { data: relationships } = await github.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number
+            });
+
+            const parentIssues = relationships.filter(comment => comment.body.includes('/parent')).map(comment => comment.body.split('/parent')[1].trim());
+
+            // If parent issues found, apply labels
+            if (parentIssues.length > 0) {
+              const labelToApply = 'parent'; // or any logic to determine labels
+              for (const parentIssue of parentIssues) {
+                await github.issues.addLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  issue_number: issue.number,
-                  labels: parentIssue.data.labels.map(label => label.name)
+                  issue_number: parentIssue,
+                  labels: [labelToApply]
                 });
               }
-            } catch (error) {
-              console.log('Parent issue not found or error occurred');
             }
