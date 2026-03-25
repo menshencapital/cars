@@ -1,0 +1,41 @@
+name: Sync Parent Labels to Sub-Issues
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  sync-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if issue is a sub-issue and copy parent labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            
+            // Get the parent issue from the issue body
+            const parentMatch = issue.body?.match(/#(\d+)/);
+            if (!parentMatch) return;
+            
+            const parentIssueNumber = parseInt(parentMatch[1]);
+            
+            try {
+              const parentIssue = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parentIssueNumber
+              });
+              
+              // Copy labels from parent to sub-issue
+              if (parentIssue.data.labels.length > 0) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: parentIssue.data.labels.map(label => label.name)
+                });
+              }
+            } catch (error) {
+              console.log('Parent issue not found or error occurred');
+            }
